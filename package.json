@@ -1,0 +1,48 @@
+{
+  "name": "buildkite-vscode",
+  "displayName": "Buildkite",
+  "description": "Securely browse and trigger authorized Buildkite pipelines.",
+  "version": "0.0.1",
+  "publisher": "buildkite-community",
+  "engines": { "vscode": "^1.95.0" },
+  "categories": ["Other"],
+  "activationEvents": ["onView:buildkite.explorer"],
+  "main": "./out/extension.js",
+  "contributes": {
+    "viewsContainers": { "activitybar": [{ "id": "buildkite", "title": "Buildkite", "icon": "resources/buildkite.svg" }] },
+    "views": { "buildkite": [{ "id": "buildkite.explorer", "name": "Buildkite" }] },
+    "commands": [
+      { "command": "buildkite.connect", "title": "Buildkite: Connect" },
+      { "command": "buildkite.replaceToken", "title": "Replace token" },
+      { "command": "buildkite.disconnect", "title": "Disconnect" },
+      { "command": "buildkite.changeOrganization", "title": "Change organisation" },
+      { "command": "buildkite.changeFolder", "title": "Buildkite: Select workspace folder" },
+      { "command": "buildkite.refresh", "title": "Buildkite: Refresh", "icon": "$(refresh)" },
+      { "command": "buildkite.searchPipelines", "title": "Buildkite: Search pipelines", "icon": "$(search)" },
+      { "command": "buildkite.loadMore", "title": "Buildkite: Load more pipelines" },
+      { "command": "buildkite.triggerBuild", "title": "Buildkite: Trigger build", "icon": "$(play)" },
+      { "command": "buildkite.openBuild", "title": "Buildkite: Open build in browser" },
+      { "command": "buildkite.expandBuild", "title": "Buildkite: Show build details" }
+    ],
+    "submenus": [
+      { "id": "buildkite.titleActions", "label": "...", "icon": "$(ellipsis)" }
+    ],
+    "menus": {
+      "view/title": [
+        { "submenu": "buildkite.titleActions", "when": "view == buildkite.explorer && buildkite.connected", "group": "navigation" }
+      ],
+      "buildkite.titleActions": [
+        { "command": "buildkite.changeOrganization", "group": "1_organization" },
+        { "command": "buildkite.replaceToken", "group": "2_token" },
+        { "command": "buildkite.disconnect", "group": "3_disconnect" }
+      ],
+      "view/item/context": [
+        { "command": "buildkite.refresh", "when": "view == buildkite.explorer && viewItem == myPipelines", "group": "inline" },
+        { "command": "buildkite.triggerBuild", "when": "view == buildkite.explorer && viewItem == myPipelines", "group": "inline" },
+        { "command": "buildkite.searchPipelines", "when": "view == buildkite.explorer && viewItem == myPipelines", "group": "inline" }
+      ]
+    }
+  },
+  "scripts": { "compile": "tsc -p .", "test": "npm run compile && node --test out/test/**/*.test.js" },
+  "devDependencies": { "@types/node": "^22.10.1", "@types/vscode": "^1.95.0", "typescript": "^5.7.2" }
+}

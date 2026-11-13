@@ -1,0 +1,6 @@
+.git/**
+src/**
+test/**
+docs/**
+*.ts
+tsconfig.json

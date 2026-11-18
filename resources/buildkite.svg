@@ -1,1 +1,7 @@
-<svg width="24" height="24" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path fill="currentColor" d="M4 3h16v18H4zM7 6v12h2V6zm4 0v12h2V6zm4 0v12h2V6z"/></svg>
+<svg width="24" height="24" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg" fill="none">
+  <title>Buildkite</title>
+  <!-- Monochrome isometric block mark, three facets with 1px gaps. VS Code masks the Activity Bar icon, so fill is the only thing that matters; currentColor keeps it theme-driven when previewed standalone. -->
+  <path fill="currentColor" d="M12 2.5 20 7l-8 4.5L4 7z"/>
+  <path fill="currentColor" d="M4 9.6l7 3.9v8L4 17.6z"/>
+  <path fill="currentColor" d="M13 13.5l7-3.9v8L13 21.5z"/>
+</svg>

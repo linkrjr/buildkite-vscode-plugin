@@ -9,3 +9,9 @@ intent/**
 tmp/**
 out/test/**
 .vscode/**
+.jj/**
+**/*.map
+.gitignore
+*.vsix
+resources/icon.svg
+.github/**

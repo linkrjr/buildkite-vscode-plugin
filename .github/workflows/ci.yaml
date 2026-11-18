@@ -1,0 +1,38 @@
+name: CI
+
+on:
+  push:
+    branches-ignore: [main]
+  pull_request:
+  workflow_call:
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - run: npm ci
+
+      # No-ops until lint/format scripts are added to package.json.
+      - name: Lint
+        run: npm run lint --if-present
+      - name: Check formatting
+        run: npm run format:check --if-present
+
+      # Compiles with tsc (type check) then runs the node:test suite.
+      - name: Test
+        run: npm test
+
+      - name: Package
+        run: npx --yes @vscode/vsce@4 package --out extension.vsix
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: extension-vsix
+          path: extension.vsix

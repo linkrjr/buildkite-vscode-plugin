@@ -10,8 +10,8 @@ tmp/**
 out/test/**
 .vscode/**
 .jj/**
-out/test/**
 **/*.map
 .gitignore
 *.vsix
 resources/icon.svg
+.github/**

@@ -28,6 +28,7 @@
       { "command": "buildkite.loadMore", "title": "Buildkite: Load more pipelines" },
       { "command": "buildkite.triggerBuild", "title": "Buildkite: Trigger build", "icon": "$(play)" },
       { "command": "buildkite.openBuild", "title": "Buildkite: Open build in browser" },
+      { "command": "buildkite.openBuildPage", "title": "Buildkite: Open build page" },
       { "command": "buildkite.expandBuild", "title": "Buildkite: Show build details" }
     ],
     "submenus": [
@@ -35,7 +36,8 @@
     ],
     "menus": {
       "commandPalette": [
-        { "command": "buildkite.openTokenPage", "when": "false" }
+        { "command": "buildkite.openTokenPage", "when": "false" },
+        { "command": "buildkite.openBuildPage", "when": "false" }
       ],
       "view/title": [
         { "submenu": "buildkite.titleActions", "when": "view == buildkite.explorer && buildkite.state == connected", "group": "navigation" }

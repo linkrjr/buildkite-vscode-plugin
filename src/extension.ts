@@ -4,6 +4,7 @@ import { originRemote } from "./git";
 import { buildDescription, buildLabel, buildTooltip, statusIcon } from "./presentation";
 import { currentProject, myPipelinesLabel, pipelineIcon, pipelineLabel, type CurrentProject } from "./tree";
 import { TOKEN_PAGE_URL, isAuthFailure, viewState, viewSubtitle } from "./viewstate";
+import { BuildPage, BuildPageTarget } from "./buildPage";
 
 const TOKEN_KEY = "buildkite.userToken";
 type NodeKind = "info" | "action" | "currentProject" | "pipelines" | "pipeline" | "build" | "job";
@@ -168,6 +169,8 @@ class BuildkiteProvider implements vscode.TreeDataProvider<Node>, vscode.Disposa
   }
   private buildKey(target: BuildTarget): string { return `${target.pipeline.slug}:${target.build.number}`; }
   async expandBuild(target: BuildTarget): Promise<void> { const client = await this.client(); if (!client || !this.state.org) return; try { this.state.buildDetails.set(this.buildKey(target), safeBuild(await client.build(this.state.org.slug, target.pipeline.slug, target.build.number))); this.changed.fire(undefined); } catch (e) { vscode.window.showErrorMessage(this.message(e)); } }
+  get organizationSlug(): string | undefined { return this.state.org?.slug; }
+  async fetchBuild(organizationSlug: string, pipelineSlug: string, number: number): Promise<Build> { const client = await this.client(); if (!client) throw new BuildkiteError("authentication"); return safeBuild(await client.build(organizationSlug, pipelineSlug, number)); }
   async trigger(): Promise<void> {
     const pipelines = this.state.pipelines; if (!this.state.org || !pipelines.length) { vscode.window.showWarningMessage("No authorized Buildkite pipeline is available."); return; }
     const pipeline = await vscode.window.showQuickPick(pipelines.map(p => ({ label: p.name, description: p.slug, pipeline: p })), { placeHolder: "Choose an authorized pipeline" }); if (!pipeline) return;
@@ -188,10 +191,13 @@ function safeBuildkiteUrl(value: string): vscode.Uri | undefined { try { const u
 
 export function activate(context: vscode.ExtensionContext): void {
   const provider = new BuildkiteProvider(context.secrets); const view = vscode.window.createTreeView("buildkite.explorer", { treeDataProvider: provider, showCollapseAll: false });
-  context.subscriptions.push(provider, view, view.onDidChangeVisibility(() => provider.setVisible(view.visible)));
+  const openUrl = (url: string) => { const uri = safeBuildkiteUrl(url); return uri ? vscode.env.openExternal(uri) : undefined; };
+  const buildPage = new BuildPage(context.extensionUri, (org, slug, n) => provider.fetchBuild(org, slug, n), openUrl);
+  context.subscriptions.push(provider.onDidChangeTreeData(() => buildPage.syncOrganization(provider.organizationSlug)));
+  context.subscriptions.push(provider, buildPage, view, view.onDidChangeVisibility(() => provider.setVisible(view.visible)));
   provider.view = view;
   provider.setVisible(view.visible);
-  const commands: [string, (...args: never[]) => unknown][] = [["buildkite.connect", () => provider.connect()], ["buildkite.replaceToken", () => provider.replaceToken()], ["buildkite.disconnect", () => provider.disconnect()], ["buildkite.changeOrganization", () => provider.chooseOrganization()], ["buildkite.changeFolder", () => provider.chooseFolder()], ["buildkite.openTokenPage", () => vscode.env.openExternal(vscode.Uri.parse(TOKEN_PAGE_URL))], ["buildkite.refresh", () => provider.refresh()], ["buildkite.searchPipelines", () => provider.search()], ["buildkite.loadMore", () => provider.loadMore()], ["buildkite.triggerBuild", () => provider.trigger()], ["buildkite.expandBuild", (target: BuildTarget) => provider.expandBuild(target)], ["buildkite.openBuild", (url: string) => { const uri = safeBuildkiteUrl(url); return uri ? vscode.env.openExternal(uri) : undefined; }]];
+  const commands: [string, (...args: never[]) => unknown][] = [["buildkite.connect", () => provider.connect()], ["buildkite.replaceToken", () => provider.replaceToken()], ["buildkite.disconnect", () => provider.disconnect()], ["buildkite.changeOrganization", () => provider.chooseOrganization()], ["buildkite.openBuildPage", (target: BuildPageTarget) => { const org = provider.organizationSlug; if (org) buildPage.show(target, org); }], ["buildkite.changeFolder", () => provider.chooseFolder()], ["buildkite.openTokenPage", () => vscode.env.openExternal(vscode.Uri.parse(TOKEN_PAGE_URL))], ["buildkite.refresh", () => provider.refresh()], ["buildkite.searchPipelines", () => provider.search()], ["buildkite.loadMore", () => provider.loadMore()], ["buildkite.triggerBuild", () => provider.trigger()], ["buildkite.expandBuild", (target: BuildTarget) => provider.expandBuild(target)], ["buildkite.openBuild", openUrl]];
   commands.forEach(([id, handler]) => context.subscriptions.push(vscode.commands.registerCommand(id, handler)));
 }
 export function deactivate(): void {}

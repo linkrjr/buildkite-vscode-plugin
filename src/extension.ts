@@ -17,7 +17,7 @@ class Node extends vscode.TreeItem {
     if (kind === "build") this.command = { command: "buildkite.expandBuild", title: "Show build details", arguments: [data] };
   }
 }
-interface State { org?: Organization; folders: readonly vscode.WorkspaceFolder[]; folder?: vscode.WorkspaceFolder; pipelines: Pipeline[]; shown: number; search: string; pipelineBuilds: Map<string, Build[]>; buildDetails: Map<string, Build>; error?: string; authError: boolean; loading: boolean; }
+interface State { org?: Organization; folders: readonly vscode.WorkspaceFolder[]; folder?: vscode.WorkspaceFolder; pipelines: Pipeline[]; shown: number; search: string; current?: CurrentProject; pipelineBuilds: Map<string, Build[]>; buildDetails: Map<string, Build>; error?: string; authError: boolean; loading: boolean; }
 function emptyState(): State { const folders = vscode.workspace.workspaceFolders ?? []; return { folders, folder: folders[0], pipelines: [], shown: 50, search: "", pipelineBuilds: new Map(), buildDetails: new Map(), authError: false, loading: false }; }
 
 function safePipeline(p: Pipeline): Pipeline { return { slug: p.slug, name: p.name, repository: pipelineRepository(p), web_url: p.web_url }; }
@@ -57,7 +57,7 @@ class BuildkiteProvider implements vscode.TreeDataProvider<Node>, vscode.Disposa
     const nodes: Node[] = [];
     if (this.state.loading) nodes.push(new Node("Refreshing Buildkite data…", "info", undefined, vscode.TreeItemCollapsibleState.None, undefined, undefined, "refreshing"));
     if (this.state.error) nodes.push(new Node(this.state.error, "info"));
-    const current = await this.matchingPipeline();
+    const current = await this.currentMatch();
     const section = new Node("Current project", "currentProject", current, vscode.TreeItemCollapsibleState.Expanded, current.kind === "match" ? current.pipeline.name : undefined, current.kind === "match" ? "currentProject" : "currentProjectNoMatch", "current-project");
     const mine = new Node(myPipelinesLabel(this.state.pipelines.length), "pipelines", undefined, vscode.TreeItemCollapsibleState.Expanded, this.state.search ? `“${this.state.search}”` : undefined, "myPipelines", "my-pipelines");
     nodes.push(section, mine);
@@ -71,7 +71,7 @@ class BuildkiteProvider implements vscode.TreeDataProvider<Node>, vscode.Disposa
     return this.pipelineChildren(current.pipeline, "current");
   }
   private async pipelineNodes(): Promise<Node[]> {
-    const current = await this.matchingPipeline();
+    const current = await this.currentMatch();
     const currentSlug = current.kind === "match" ? current.pipeline.slug : undefined;
     const filtered = this.filteredPipelines();
     const nodes = filtered.slice(0, this.state.shown).map(p => {
@@ -100,6 +100,7 @@ class BuildkiteProvider implements vscode.TreeDataProvider<Node>, vscode.Disposa
     try {
       const builds = (await client.builds(this.state.org.slug, pipeline.slug)).slice(0, 20).map(safeBuild);
       this.state.pipelineBuilds.set(pipeline.slug, builds);
+      this.changed.fire(undefined);
       return builds;
     } catch (e) {
       this.fail(e);
@@ -131,7 +132,7 @@ class BuildkiteProvider implements vscode.TreeDataProvider<Node>, vscode.Disposa
     try { const orgs = existing ?? await client.organizations(); const choice = await vscode.window.showQuickPick(orgs.map(o => ({ label: o.name, description: o.slug, org: o })), { placeHolder: "Select an authorized Buildkite organization" }); if (!choice) return; this.state.org = choice.org; this.state.authError = false; this.state.error = undefined; this.state.pipelines = []; this.state.pipelineBuilds.clear(); this.state.buildDetails.clear(); this.state.shown = 50; this.state.search = ""; await this.refresh(); }
     catch (e) { this.fail(e); this.changed.fire(undefined); }
   }
-  async chooseFolder(): Promise<void> { const folders = vscode.workspace.workspaceFolders ?? []; const choice = await vscode.window.showQuickPick(folders.map(f => ({ label: f.name, description: f.uri.fsPath, folder: f })), { placeHolder: "Choose workspace folder for current project" }); if (choice) { this.state.folder = choice.folder; await this.refresh(); } }
+  async chooseFolder(): Promise<void> { const folders = vscode.workspace.workspaceFolders ?? []; const choice = await vscode.window.showQuickPick(folders.map(f => ({ label: f.name, description: f.uri.fsPath, folder: f })), { placeHolder: "Choose workspace folder for current project" }); if (choice) { this.state.folder = choice.folder; this.state.current = undefined; await this.refresh(); } }
   async search(): Promise<void> { const q = await vscode.window.showInputBox({ prompt: "Search authorized pipelines", value: this.state.search }); if (q !== undefined) { this.state.search = q.trim(); this.state.shown = 50; this.changed.fire(undefined); } }
   loadMore(): void { this.state.shown += 50; this.changed.fire(undefined); }
   async refresh(): Promise<void> {
@@ -149,12 +150,15 @@ class BuildkiteProvider implements vscode.TreeDataProvider<Node>, vscode.Disposa
         catch { refreshedBuilds.set(slug, previous); }
       }));
       this.state.pipelines = pipelines;
+      this.state.current = undefined;
+      this.state.current = await this.currentMatch();
       this.state.pipelineBuilds = refreshedBuilds;
       this.state.buildDetails.clear();
     } catch (e) { this.fail(e); }
     finally { this.state.loading = false; this.changed.fire(undefined); }
   }
-  private async matchingPipeline(): Promise<CurrentProject> { return currentProject(this.state.folder ? await originRemote(this.state.folder.uri.fsPath) : undefined, this.state.pipelines); }
+  /** Cached per refresh/folder change; computed lazily before the first refresh. */
+  private async currentMatch(): Promise<CurrentProject> { return this.state.current ??= currentProject(this.state.folder ? await originRemote(this.state.folder.uri.fsPath) : undefined, this.state.pipelines); }
   private buildKey(target: BuildTarget): string { return `${target.pipeline.slug}:${target.build.number}`; }
   async expandBuild(target: BuildTarget): Promise<void> { const client = await this.client(); if (!client || !this.state.org) return; try { this.state.buildDetails.set(this.buildKey(target), safeBuild(await client.build(this.state.org.slug, target.pipeline.slug, target.build.number))); this.changed.fire(undefined); } catch (e) { vscode.window.showErrorMessage(this.message(e)); } }
   async trigger(): Promise<void> {

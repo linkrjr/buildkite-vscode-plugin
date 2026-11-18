@@ -1,12 +1,12 @@
 ---
 title: Current project and My Pipelines sections with styled build rows
-status: todo
+status: done
 created-at: 2026-11-18
 ---
 
 # Intent: Current project and My Pipelines sections with styled build rows
 
-Author: Ronaldo Gomes. Status: todo
+Author: Ronaldo Gomes. Status: done
 
 ## Problem
 

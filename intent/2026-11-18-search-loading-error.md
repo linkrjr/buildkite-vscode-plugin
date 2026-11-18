@@ -1,12 +1,12 @@
 ---
 title: Search filter display, progress bar and error row
-status: todo
+status: done
 created-at: 2026-11-18
 ---
 
 # Intent: Search filter display, progress bar and error row
 
-Author: Ronaldo Gomes. Status: todo
+Author: Ronaldo Gomes. Status: done
 
 ## Problem
 

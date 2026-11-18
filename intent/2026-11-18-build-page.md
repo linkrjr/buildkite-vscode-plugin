@@ -1,12 +1,12 @@
 ---
 title: Build page webview
-status: todo
+status: done
 created-at: 2026-11-18
 ---
 
 # Intent: Build page webview
 
-Author: Ronaldo Gomes. Status: todo
+Author: Ronaldo Gomes. Status: done
 
 ## Problem
 

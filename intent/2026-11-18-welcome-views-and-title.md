@@ -1,12 +1,12 @@
 ---
 title: Welcome screens, view subtitle and overflow menu
-status: todo
+status: done
 created-at: 2026-11-18
 ---
 
 # Intent: Welcome screens, view subtitle and overflow menu
 
-Author: Ronaldo Gomes. Status: todo
+Author: Ronaldo Gomes. Status: done
 
 ## Problem
 

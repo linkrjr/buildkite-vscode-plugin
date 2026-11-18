@@ -1,12 +1,12 @@
 ---
 title: Quick trigger from the Current project section
-status: todo
+status: done
 created-at: 2026-11-18
 ---
 
 # Intent: Quick trigger from the Current project section
 
-Author: Ronaldo Gomes. Status: todo
+Author: Ronaldo Gomes. Status: done
 
 ## Problem
 

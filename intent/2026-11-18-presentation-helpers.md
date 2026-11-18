@@ -1,12 +1,12 @@
 ---
 title: Presentation helpers for build status and times
-status: todo
+status: done
 created-at: 2026-11-18
 ---
 
 # Intent: Presentation helpers for build status and times
 
-Author: Ronaldo Gomes. Status: todo
+Author: Ronaldo Gomes. Status: done
 
 ## Problem
 

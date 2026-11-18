@@ -20,13 +20,14 @@ execFileSync("git", ["-C", repo, "remote", "add", "origin", "git@github.com:acme
 
 const secrets = new Map<string, string>();
 let provider: any; let fires = 0; const progress: any[] = [];
+const registered = new Map<string, (...a: any[]) => any>(); const opened: string[] = [];
 const vscodeMock: any = {
   TreeItem, ThemeIcon, ThemeColor, MarkdownString, EventEmitter,
   TreeItemCollapsibleState: { None: 0, Collapsed: 1, Expanded: 2 },
-  Uri: { parse: (s: string) => ({ toString: () => s }) },
+  Uri: { parse: (s: string) => { const u = new URL(s); return { scheme: u.protocol.slice(0, -1), authority: u.host, toString: () => s }; } },
   workspace: { workspaceFolders: [{ name: "app", uri: { fsPath: repo } }] },
-  commands: { executeCommand: async () => undefined, registerCommand: () => ({ dispose() {} }) },
-  env: { openExternal: async () => true },
+  commands: { executeCommand: async () => undefined, registerCommand: (id: string, h: any) => { registered.set(id, h); return { dispose() {} }; } },
+  env: { openExternal: async (u: any) => { opened.push(u.toString()); return true; } },
   window: {
     withProgress: async (o: any, task: () => Promise<unknown>) => { progress.push(o); return task(); },
     showInputBox: async () => "tok", showQuickPick: async (items: any[]) => items[0],
@@ -41,7 +42,7 @@ const json = (body: unknown) => new Response(JSON.stringify(body), { status: 200
 const build = (n: number, state = "passed") => ({ number: n, state, branch: "main", message: `m${n}`, commit: "abcdef1234" });
 const pipelines = [{ slug: "app", name: "App", repository: "https://github.com/acme/app.git" }, ...Array.from({ length: 59 }, (_, i) => ({ slug: `p${i}`, name: `P${String(i).padStart(2, "0")}`, repository: `https://github.com/x/p${i}` }))];
 globalThis.fetch = (async (url: string) => {
-  if (url.includes("/builds")) return json(Array.from({ length: 30 }, (_, i) => build(i + 1, "failed")));
+  if (url.includes("/builds")) return json(Array.from({ length: 30 }, (_, i) => i === 0 ? { ...build(1, "scheduled"), created_at: new Date(Date.now() - 180_000).toISOString(), web_url: "https://buildkite.com/acme/app/builds/1" } : build(i + 1, "failed")));
   if (url.includes("/pipelines")) return json(url.includes("page=1") ? pipelines : []);
   return json([{ slug: "acme", name: "Acme" }]);
 }) as typeof fetch;
@@ -263,4 +264,47 @@ test("AC9 quick trigger pre-fills empty branch on detached HEAD", async () => {
   const r = await runQuick(["checkout", "-q", "--detach"], [undefined]);
   assert.equal(r.boxes[0].value, "");
   assert.equal(r.posts.length, 0);
+});
+
+test("AC15 build rows have no collapsible state and click opens the build page with pipeline and number", async () => {
+  await setup;
+  const [section] = await provider.getChildren();
+  const [row] = await provider.getChildren(section);
+  assert.equal(row.collapsibleState, 0);
+  assert.equal(row.contextValue, "build");
+  assert.equal(row.command.command, "buildkite.openBuildPage");
+  assert.deepEqual(row.command.arguments, [{ pipeline: { slug: "app", name: "App" }, number: 1 }]);
+  assert.deepEqual(await provider.getChildren(row), []);
+});
+
+test("AC15 old expand-build path is gone", () => {
+  assert.equal(registered.has("buildkite.expandBuild"), false);
+  const pkg = JSON.parse(readFileSync(join(__dirname, "..", "..", "package.json"), "utf8"));
+  assert.ok(!pkg.contributes.commands.some((c: any) => c.command === "buildkite.expandBuild"));
+});
+
+test("AC15 inline link-external button on build rows runs openBuild", () => {
+  const pkg = JSON.parse(readFileSync(join(__dirname, "..", "..", "package.json"), "utf8"));
+  const cmd = pkg.contributes.commands.find((c: any) => c.command === "buildkite.openBuild");
+  assert.equal(cmd.icon, "$(link-external)");
+  assert.ok(pkg.contributes.menus["view/item/context"].some((m: any) => m.command === "buildkite.openBuild" && /viewItem == build\b/.test(m.when) && m.group === "inline"));
+});
+
+test("AC15 openBuild opens the row's https buildkite URL and refuses others", async () => {
+  await setup;
+  const [section] = await provider.getChildren();
+  const [row] = await provider.getChildren(section);
+  const open = registered.get("buildkite.openBuild")!;
+  opened.length = 0;
+  await open(row);
+  assert.deepEqual(opened, ["https://buildkite.com/acme/app/builds/1"]);
+  await open("https://evil.example/x"); await open("http://buildkite.com/x"); await open({ data: { build: {} } });
+  assert.equal(opened.length, 1);
+});
+
+test("AC12 a build without started_at keeps created_at so its description shows relative time", async () => {
+  await setup;
+  const [section] = await provider.getChildren();
+  const [row] = await provider.getChildren(section);
+  assert.equal(row.description, "main · 3m ago");
 });

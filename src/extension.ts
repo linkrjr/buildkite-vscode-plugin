@@ -129,7 +129,7 @@ class BuildkiteProvider implements vscode.TreeDataProvider<Node>, vscode.Disposa
   private clear(): void { this.state = emptyState(); this.changed.fire(undefined); }
   async chooseOrganization(existing?: Organization[]): Promise<void> {
     const client = await this.client(); if (!client) return;
-    try { const orgs = existing ?? await client.organizations(); const choice = await vscode.window.showQuickPick(orgs.map(o => ({ label: o.name, description: o.slug, org: o })), { placeHolder: "Select an authorized Buildkite organization" }); if (!choice) return; this.state.org = choice.org; this.state.authError = false; this.state.error = undefined; this.state.pipelines = []; this.state.pipelineBuilds.clear(); this.state.buildDetails.clear(); this.state.shown = 50; this.state.search = ""; await this.refresh(); }
+    try { const orgs = existing ?? await client.organizations(); const choice = await vscode.window.showQuickPick(orgs.map(o => ({ label: o.name, description: o.slug, org: o })), { placeHolder: "Select an authorized Buildkite organization" }); if (!choice) return; this.state.org = choice.org; this.state.authError = false; this.state.error = undefined; this.state.pipelines = []; this.state.current = undefined; this.state.pipelineBuilds.clear(); this.state.buildDetails.clear(); this.state.shown = 50; this.state.search = ""; await this.refresh(); }
     catch (e) { this.fail(e); this.changed.fire(undefined); }
   }
   async chooseFolder(): Promise<void> { const folders = vscode.workspace.workspaceFolders ?? []; const choice = await vscode.window.showQuickPick(folders.map(f => ({ label: f.name, description: f.uri.fsPath, folder: f })), { placeHolder: "Choose workspace folder for current project" }); if (choice) { this.state.folder = choice.folder; this.state.current = undefined; await this.refresh(); } }
@@ -158,7 +158,14 @@ class BuildkiteProvider implements vscode.TreeDataProvider<Node>, vscode.Disposa
     finally { this.state.loading = false; this.changed.fire(undefined); }
   }
   /** Cached per refresh/folder change; computed lazily before the first refresh. */
-  private async currentMatch(): Promise<CurrentProject> { return this.state.current ??= currentProject(this.state.folder ? await originRemote(this.state.folder.uri.fsPath) : undefined, this.state.pipelines); }
+  private async currentMatch(): Promise<CurrentProject> {
+    if (this.state.current) return this.state.current;
+    const { pipelines, folder } = this.state;
+    const computed = currentProject(folder ? await originRemote(folder.uri.fsPath) : undefined, pipelines);
+    // Commit only if nothing replaced the inputs while git was running; otherwise a stale result must not overwrite a fresher one.
+    if (!this.state.current && this.state.pipelines === pipelines && this.state.folder === folder) this.state.current = computed;
+    return this.state.current ?? computed;
+  }
   private buildKey(target: BuildTarget): string { return `${target.pipeline.slug}:${target.build.number}`; }
   async expandBuild(target: BuildTarget): Promise<void> { const client = await this.client(); if (!client || !this.state.org) return; try { this.state.buildDetails.set(this.buildKey(target), safeBuild(await client.build(this.state.org.slug, target.pipeline.slug, target.build.number))); this.changed.fire(undefined); } catch (e) { vscode.window.showErrorMessage(this.message(e)); } }
   async trigger(): Promise<void> {

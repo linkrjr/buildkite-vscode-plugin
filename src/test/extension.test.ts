@@ -110,3 +110,40 @@ test("AC8 Refresh is inline on Current project and My Pipelines section rows", (
   assert.ok(refresh.some((m: any) => /currentProject/.test(m.when) && /currentProjectNoMatch/.test(m.when) && m.group === "inline"));
   assert.ok(refresh.some((m: any) => /viewItem == myPipelines/.test(m.when) && m.group === "inline"));
 });
+
+test("a stale render awaiting git does not overwrite a match committed by a concurrent refresh", async () => {
+  await setup;
+  await provider.refresh();
+  const fresh = provider.state.current;
+  assert.equal(fresh.kind, "match");
+  const stalePipelines = provider.state.pipelines;
+  provider.state.current = undefined;
+  provider.state.pipelines = [];
+  const stale = provider.currentMatch(); // reads [] then awaits git
+  provider.state.pipelines = stalePipelines;
+  provider.state.current = fresh; // refresh finishes meanwhile
+  await stale;
+  assert.equal(provider.state.current, fresh);
+});
+
+test("disconnect drops the cached current match", async () => {
+  await setup;
+  await provider.refresh();
+  assert.ok(provider.state.current);
+  await provider.disconnect();
+  assert.equal(provider.state.current, undefined);
+  await provider.connect();
+});
+
+test("changing organization drops the cached current match until refresh recomputes it", async () => {
+  await setup;
+  await provider.refresh();
+  assert.equal(provider.state.current.kind, "match");
+  const seen: unknown[] = [];
+  const orig = provider.refresh.bind(provider);
+  provider.refresh = async () => { seen.push(provider.state.current); await orig(); };
+  await provider.chooseOrganization();
+  provider.refresh = orig;
+  assert.deepEqual(seen, [undefined]);
+  assert.equal(provider.state.current.kind, "match");
+});

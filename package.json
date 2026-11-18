@@ -25,6 +25,8 @@
       { "command": "buildkite.changeFolder", "title": "Select workspace folder" },
       { "command": "buildkite.refresh", "title": "Buildkite: Refresh", "icon": "$(refresh)" },
       { "command": "buildkite.searchPipelines", "title": "Buildkite: Search pipelines", "icon": "$(search)" },
+      { "command": "buildkite.retry", "title": "Retry", "icon": "$(debug-restart)" },
+      { "command": "buildkite.clearFilter", "title": "Buildkite: Clear filter", "icon": "$(close)" },
       { "command": "buildkite.loadMore", "title": "Buildkite: Load more pipelines" },
       { "command": "buildkite.triggerBuild", "title": "Buildkite: Trigger build", "icon": "$(play)" },
       { "command": "buildkite.openBuild", "title": "Buildkite: Open build in browser" },
@@ -50,9 +52,11 @@
       ],
       "view/item/context": [
         { "command": "buildkite.refresh", "when": "view == buildkite.explorer && (viewItem == currentProject || viewItem == currentProjectNoMatch)", "group": "inline" },
-        { "command": "buildkite.refresh", "when": "view == buildkite.explorer && viewItem == myPipelines", "group": "inline" },
-        { "command": "buildkite.triggerBuild", "when": "view == buildkite.explorer && viewItem == myPipelines", "group": "inline" },
-        { "command": "buildkite.searchPipelines", "when": "view == buildkite.explorer && viewItem == myPipelines", "group": "inline" }
+        { "command": "buildkite.refresh", "when": "view == buildkite.explorer && viewItem =~ /^myPipelines/", "group": "inline" },
+        { "command": "buildkite.triggerBuild", "when": "view == buildkite.explorer && viewItem =~ /^myPipelines/", "group": "inline" },
+        { "command": "buildkite.searchPipelines", "when": "view == buildkite.explorer && viewItem == myPipelines", "group": "inline" },
+        { "command": "buildkite.clearFilter", "when": "view == buildkite.explorer && viewItem == myPipelinesFiltered", "group": "inline" },
+        { "command": "buildkite.retry", "when": "view == buildkite.explorer && viewItem == errorRow", "group": "inline" }
       ]
     }
   },

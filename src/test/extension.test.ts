@@ -19,7 +19,7 @@ execFileSync("git", ["-C", repo, "init", "-q"]);
 execFileSync("git", ["-C", repo, "remote", "add", "origin", "git@github.com:acme/app.git"]);
 
 const secrets = new Map<string, string>();
-let provider: any; let fires = 0;
+let provider: any; let fires = 0; const progress: any[] = [];
 const vscodeMock: any = {
   TreeItem, ThemeIcon, ThemeColor, MarkdownString, EventEmitter,
   TreeItemCollapsibleState: { None: 0, Collapsed: 1, Expanded: 2 },
@@ -28,6 +28,7 @@ const vscodeMock: any = {
   commands: { executeCommand: async () => undefined, registerCommand: () => ({ dispose() {} }) },
   env: { openExternal: async () => true },
   window: {
+    withProgress: async (o: any, task: () => Promise<unknown>) => { progress.push(o); return task(); },
     showInputBox: async () => "tok", showQuickPick: async (items: any[]) => items[0],
     showInformationMessage() {}, showErrorMessage() {}, showWarningMessage() {},
     createTreeView: (_id: string, o: any) => { provider = o.treeDataProvider; return { visible: false, onDidChangeVisibility: () => ({ dispose() {} }), dispose() {} }; }
@@ -108,7 +109,7 @@ test("AC8 Refresh is inline on Current project and My Pipelines section rows", (
   const menus = JSON.parse(readFileSync(join(__dirname, "..", "..", "package.json"), "utf8")).contributes.menus["view/item/context"];
   const refresh = menus.filter((m: any) => m.command === "buildkite.refresh");
   assert.ok(refresh.some((m: any) => /currentProject/.test(m.when) && /currentProjectNoMatch/.test(m.when) && m.group === "inline"));
-  assert.ok(refresh.some((m: any) => /viewItem == myPipelines/.test(m.when) && m.group === "inline"));
+  assert.ok(refresh.some((m: any) => /myPipelines/.test(m.when) && m.group === "inline"));
 });
 
 test("a stale render awaiting git does not overwrite a match committed by a concurrent refresh", async () => {
@@ -146,4 +147,75 @@ test("changing organization drops the cached current match until refresh recompu
   provider.refresh = orig;
   assert.deepEqual(seen, [undefined]);
   assert.equal(provider.state.current.kind, "match");
+});
+
+test("AC11 filter shows query with matches of total, Clear filter restores the list", async () => {
+  await setup;
+  provider.state.search = "P01";
+  const nodes = await provider.getChildren();
+  assert.equal(nodes[1].description, "“P01” · 1 of 60");
+  assert.equal(nodes[1].contextValue, "myPipelinesFiltered");
+  provider.clearFilter();
+  const cleared = await provider.getChildren();
+  assert.equal(cleared[1].description, undefined);
+  assert.equal(cleared[1].contextValue, "myPipelines");
+  assert.equal((await provider.getChildren(cleared[1])).length, 51);
+});
+
+test("AC11 no matches shows a muted row; menus swap Search for Clear filter", async () => {
+  await setup;
+  provider.state.search = "zzz";
+  const nodes = await provider.getChildren();
+  const [row] = await provider.getChildren(nodes[1]);
+  assert.equal(row.label, "No pipelines match “zzz”");
+  provider.clearFilter();
+  const menus = JSON.parse(readFileSync(join(__dirname, "..", "..", "package.json"), "utf8")).contributes.menus["view/item/context"];
+  assert.ok(menus.some((m: any) => m.command === "buildkite.searchPipelines" && m.when.endsWith("viewItem == myPipelines")));
+  assert.ok(menus.some((m: any) => m.command === "buildkite.clearFilter" && m.when.endsWith("viewItem == myPipelinesFiltered")));
+});
+
+test("AC17 refresh runs inside the view progress and keeps loaded rows", async () => {
+  await setup;
+  progress.length = 0;
+  let during: any[] = [];
+  const unsub = provider.onDidChangeTreeData(async () => { if (provider.state.loading) during = await provider.getChildren(); });
+  await provider.refresh();
+  assert.deepEqual(progress[0].location, { viewId: "buildkite.explorer" });
+  assert.equal(during[0].label, "Current project");
+  assert.ok(during.every((n: any) => n.label !== "Refreshing Buildkite data…"));
+});
+
+test("AC18 failed refresh shows one red error row with Retry that clears after success", async () => {
+  await setup;
+  const orig = globalThis.fetch;
+  globalThis.fetch = (async () => new Response("{}", { status: 500 })) as typeof fetch;
+  await provider.refresh();
+  globalThis.fetch = orig;
+  let nodes = await provider.getChildren();
+  assert.equal(nodes.filter((n: any) => n.contextValue === "errorRow").length, 1);
+  assert.equal(nodes[0].contextValue, "errorRow");
+  assert.equal((nodes[0].iconPath as ThemeIcon).id, "error");
+  assert.equal((nodes[0].iconPath as any).color.id, "errorForeground");
+  const menus = JSON.parse(readFileSync(join(__dirname, "..", "..", "package.json"), "utf8")).contributes.menus["view/item/context"];
+  assert.ok(menus.some((m: any) => m.command === "buildkite.retry" && /errorRow/.test(m.when) && m.group === "inline"));
+  await provider.refresh();
+  nodes = await provider.getChildren();
+  assert.ok(nodes.every((n: any) => n.contextValue !== "errorRow"));
+});
+
+test("AC18 a failed builds load surfaces through the error row, not 'No recent builds'", async () => {
+  await setup;
+  await provider.refresh();
+  provider.state.pipelineBuilds.clear();
+  const orig = globalThis.fetch;
+  globalThis.fetch = (async () => new Response("{}", { status: 500 })) as typeof fetch;
+  const nodes = await provider.getChildren();
+  const rows = await provider.getChildren(nodes.find((n: any) => n.label.startsWith("My Pipelines")));
+  const before = fires;
+  const children = await provider.getChildren(rows[0]);
+  globalThis.fetch = orig;
+  assert.deepEqual(children, []);
+  assert.ok(fires > before);
+  assert.equal((await provider.getChildren())[0].contextValue, "errorRow");
+  await provider.refresh();
 });

@@ -66,3 +66,14 @@ test("AC14 tooltip has all fields and escapes markdown", () => {
   const none = buildTooltip({ number: 2, state: "running" });
   assert.ok(none.includes("Finished: —"));
 });
+
+test("formatDuration returns 0s for non-finite input", () => {
+  assert.equal(formatDuration(NaN), "0s");
+  assert.equal(formatDuration(Infinity), "0s");
+  assert.equal(formatDuration(-Infinity), "0s");
+});
+
+test("AC12 label treats CR-only line breaks as line breaks", () => {
+  assert.equal(firstLine("a\rb"), "a");
+  assert.equal(buildLabel({ number: 4, state: "x", message: "\r\ra\rb" }), "#4 a");
+});

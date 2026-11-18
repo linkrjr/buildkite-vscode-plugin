@@ -36,7 +36,7 @@ export function absoluteTime(iso: string | undefined): string {
 }
 
 export function formatDuration(ms: number): string {
-  const s = Math.max(0, Math.floor(ms / 1000));
+  const s = Number.isFinite(ms) ? Math.max(0, Math.floor(ms / 1000)) : 0;
   if (s < 60) return `${s}s`;
   if (s < 3600) return `${Math.floor(s / 60)}m ${String(s % 60).padStart(2, "0")}s`;
   return `${Math.floor(s / 3600)}h ${String(Math.floor((s % 3600) / 60)).padStart(2, "0")}m`;
@@ -45,7 +45,7 @@ export function formatDuration(ms: number): string {
 export const shortCommit = (commit: string | undefined): string => (commit ?? "").slice(0, 7);
 
 export const firstLine = (message: string | undefined): string =>
-  (message ?? "").split(/\r?\n/).map((l) => l.trim()).find((l) => l) ?? "";
+  (message ?? "").split(/\r\n|\r|\n/).map((l) => l.trim()).find((l) => l) ?? "";
 
 export function buildLabel(build: BuildLike): string {
   const line = firstLine(build.message);
@@ -64,7 +64,7 @@ const escapeMarkdown = (text: string): string => text.replace(/[\\`*_{}\[\]()#+\
 export function buildTooltip(build: BuildLike): string {
   const msg = (build.message ?? "").trim();
   const lines = [`**${escapeMarkdown(buildLabel(build))}**`];
-  if (msg) lines.push("", escapeMarkdown(msg).replace(/\r?\n/g, "  \n"));
+  if (msg) lines.push("", escapeMarkdown(msg).replace(/\r\n|\r|\n/g, "  \n"));
   lines.push("",
     `Status: ${escapeMarkdown(build.state)}  `,
     `Branch: ${escapeMarkdown(build.branch || "—")}  `,

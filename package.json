@@ -47,6 +47,7 @@
         { "command": "buildkite.disconnect", "group": "3_disconnect" }
       ],
       "view/item/context": [
+        { "command": "buildkite.refresh", "when": "view == buildkite.explorer && (viewItem == currentProject || viewItem == currentProjectNoMatch)", "group": "inline" },
         { "command": "buildkite.refresh", "when": "view == buildkite.explorer && viewItem == myPipelines", "group": "inline" },
         { "command": "buildkite.triggerBuild", "when": "view == buildkite.explorer && viewItem == myPipelines", "group": "inline" },
         { "command": "buildkite.searchPipelines", "when": "view == buildkite.explorer && viewItem == myPipelines", "group": "inline" }

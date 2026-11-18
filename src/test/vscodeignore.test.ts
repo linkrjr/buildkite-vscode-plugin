@@ -7,7 +7,7 @@ const lines = readFileSync(join(__dirname, "..", "..", ".vscodeignore"), "utf8")
   .split(/\r?\n/)
   .map((l) => l.trim());
 
-for (const pattern of ["graphify-out/**", "intent/**", "tmp/**", "out/test/**"]) {
+for (const pattern of ["graphify-out/**", "intent/**", "tmp/**", "out/test/**", ".vscode/**"]) {
   test(`.vscodeignore excludes ${pattern}`, () => {
     assert.ok(lines.includes(pattern));
   });

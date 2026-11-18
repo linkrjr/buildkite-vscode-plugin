@@ -5,7 +5,7 @@ import { formatDuration, isFinishedState, relativeTime, shortCommit, statusIcon 
 export type BuildPageModel =
   | { status: "loading" }
   | { status: "error"; message: string }
-  | { status: "ready"; pipelineName: string; build: Build; refreshing?: boolean };
+  | { status: "ready"; pipelineName: string; build: Build; refreshing?: boolean; stale?: boolean };
 
 export const POLL_INTERVAL_MS = 10_000;
 
@@ -15,7 +15,8 @@ export const escapeHtml = (text: string): string =>
 export const shouldPoll = (visible: boolean, state: string | undefined): boolean =>
   visible && state !== undefined && !isFinishedState(state);
 
-const GLYPH: Record<string, string> = { check: "✓", close: "✕", "loading~spin": "◌", clock: "◷", "debug-pause": "⏸", "circle-slash": "⊘", "circle-outline": "○" };
+const SPINNER = `<svg class="spinner" width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" aria-hidden="true" focusable="false"><circle cx="8" cy="8" r="6" opacity="0.3"/><path d="M8 2a6 6 0 0 1 6 6"/></svg>`;
+const GLYPH: Record<string, string> = { check: "✓", close: "✕", "loading~spin": SPINNER, clock: "◷", "debug-pause": "⏸", "circle-slash": "⊘", "circle-outline": "○" };
 const LABEL: Record<string, string> = { passed: "Passed", failed: "Failed", running: "Running", scheduled: "Scheduled", creating: "Scheduled", waiting: "Scheduled", blocked: "Blocked", canceled: "Canceled", canceling: "Canceled", skipped: "Canceled", "not run": "Canceled", not_run: "Canceled" };
 
 function icon(state: string): string {
@@ -50,10 +51,11 @@ export function renderBuildPage(model: BuildPageModel, now: Date): string {
   const jobs = b.jobs ?? [];
   const meta = [`<span class="muted">⎇ ${escapeHtml(b.branch || "—")}</span>`, `<span class="muted mono">${escapeHtml(shortCommit(b.commit) || "—")}</span>`, `<span class="muted">${escapeHtml(b.creator?.name || "Unknown")}</span>`].join("");
   const jobList = jobs.length ? `<ul class="jobs">${jobs.map((j, i) => jobRow(j, i, now)).join("")}</ul>` : `<div class="empty">No jobs yet</div>`;
-  const foot = finished ? "" : `<p class="muted foot"><span class="icon spin" aria-hidden="true">◌</span> Refreshes every 10 s while this tab is visible</p>`;
-  return `<header><div class="row1"><h1>${escapeHtml(model.pipelineName)} <span class="muted">#${b.number}</span></h1><div class="actions"><button class="btn secondary" data-action="refresh"${model.refreshing ? ' aria-busy="true" disabled' : ""}>${model.refreshing ? '<span class="icon spin" aria-hidden="true">◌</span> ' : ""}Refresh</button><button class="btn primary" data-action="openBuild">Open in Buildkite ↗</button></div></div>
+  const notice = model.stale ? `<p class="notice" role="status">Couldn't refresh — retrying</p>` : "";
+  const foot = finished ? "" : `<p class="muted foot"><span class="icon spin" aria-hidden="true">${SPINNER}</span> Refreshes every 10 s while this tab is visible</p>`;
+  return `<header><div class="row1"><h1>${escapeHtml(model.pipelineName)} <span class="muted">#${b.number}</span></h1><div class="actions"><button class="btn secondary" data-action="refresh"${model.refreshing ? ' aria-busy="true" disabled' : ""}>${model.refreshing ? '<span class="icon spin" aria-hidden="true">${SPINNER}</span> ' : ""}Refresh</button><button class="btn primary" data-action="openBuild">Open in Buildkite ↗</button></div></div>
 <div class="row2"><span class="badge s-${escapeHtml(statusIcon(b.state).color.replace(/\./g, "-"))}">${icon(b.state)} ${label}</span>${meta}</div>
-<p class="message">${escapeHtml((b.message ?? "").trim())}</p><p class="muted">${escapeHtml(timing)}</p></header>
+<p class="message">${escapeHtml((b.message ?? "").trim())}</p><p class="muted">${escapeHtml(timing)}</p>${notice}</header>
 <section><h2>Jobs <span class="chip">${jobs.length}</span></h2>${jobList}${foot}</section>`;
 }
 
@@ -71,7 +73,7 @@ h1{font-size:20px;line-height:28px;font-weight:600;margin:0}h2{font-size:11px;te
 .btn:focus-visible,.link:focus-visible{outline:2px solid var(--vscode-focusBorder);outline-offset:2px}
 .badge{display:inline-flex;gap:4px;align-items:center;padding:2px 10px;border-radius:999px;border:1px solid currentColor;font-weight:600;background:color-mix(in srgb,currentColor 16%,transparent)}
 .badge .icon{color:inherit}
-.icon{display:inline-block}.spin{animation:spin 1s linear infinite}@keyframes spin{to{transform:rotate(360deg)}}
+.icon{display:inline-flex;align-items:center}.spin{animation:spin 1s linear infinite}@keyframes spin{to{transform:rotate(360deg)}}
 .c-testing-iconPassed{color:var(--vscode-testing-iconPassed)}.c-testing-iconFailed{color:var(--vscode-testing-iconFailed)}.c-charts-blue{color:var(--vscode-charts-blue)}.c-charts-yellow{color:var(--vscode-charts-yellow)}.c-descriptionForeground{color:var(--vscode-descriptionForeground)}
 .s-testing-iconPassed{color:var(--vscode-testing-iconPassed)}.s-testing-iconFailed{color:var(--vscode-testing-iconFailed)}.s-charts-blue{color:var(--vscode-charts-blue)}.s-charts-yellow{color:var(--vscode-charts-yellow)}.s-descriptionForeground{color:var(--vscode-descriptionForeground)}
 .chip{background:var(--vscode-badge-background);color:var(--vscode-badge-foreground);border-radius:999px;padding:0 6px}
@@ -82,9 +84,11 @@ h1{font-size:20px;line-height:28px;font-weight:600;margin:0}h2{font-size:11px;te
 .empty{border:1px dashed var(--vscode-widget-border,var(--vscode-panel-border));border-radius:4px;padding:16px;text-align:center;color:var(--vscode-descriptionForeground)}
 .error{display:flex;gap:12px;align-items:center;padding:12px;border:1px solid var(--vscode-inputValidation-errorBorder);border-left-width:4px;background:var(--vscode-inputValidation-errorBackground);color:var(--vscode-inputValidation-errorForeground,inherit)}.error div{flex:1}
 .sk{height:14px;margin:12px 0;width:50%;background:var(--vscode-editor-inactiveSelectionBackground);animation:pulse 2s ease-in-out infinite}.sk-title{height:24px;width:30%}.sk-wide{width:90%}@keyframes pulse{50%{opacity:.4}}
-.foot{font-size:12px}
+.foot{font-size:12px}.spinner{display:block}
+.notice{margin:8px 0 0;padding:4px 8px;border-left:3px solid var(--vscode-editorWarning-foreground,var(--vscode-charts-yellow));background:var(--vscode-editorWidget-background,transparent)}
 @media (max-width:560px){.job{grid-template-columns:20px 1fr 28px}.job-time,.job-exit{grid-column:2}}
 body.vscode-high-contrast .badge{background:transparent;color:var(--vscode-editor-foreground);border-color:var(--vscode-contrastBorder,currentColor)}
+body.vscode-high-contrast .c-charts-blue,body.vscode-high-contrast .s-charts-blue{color:var(--vscode-contrastActiveBorder,var(--vscode-editor-foreground))}
 body.vscode-high-contrast .btn{border-color:var(--vscode-contrastBorder)}body.vscode-high-contrast .jobs{border-color:var(--vscode-contrastBorder)}body.vscode-high-contrast .link{color:var(--vscode-editor-foreground)}
 `;
 
@@ -92,6 +96,7 @@ const SCRIPT = `
 const vscode = acquireVsCodeApi();
 const root = document.getElementById("root");
 window.addEventListener("message", (e) => { if (e.data && typeof e.data.html === "string") root.innerHTML = e.data.html; });
+vscode.postMessage({ type: "ready" });
 document.addEventListener("click", (e) => {
   const el = e.target.closest("[data-action],[data-job]");
   if (!el) return;

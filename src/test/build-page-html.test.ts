@@ -67,3 +67,16 @@ test("AC23 polls only when visible and build unfinished", () => {
   assert.equal(shouldPoll(false, "running"), false);
   assert.equal(shouldPoll(true, undefined), false);
 });
+
+test("AC24 running indicator is a visible SVG spinner using currentColor, with a high-contrast colour override", () => {
+  const html = view({ ...build, state: "running", finished_at: undefined, started_at: ago(5), jobs: [{ name: "T", state: "running", started_at: ago(5) }] });
+  assert.match(html, /<svg class="spinner"[^>]*stroke="currentColor"/);
+  assert.ok(!html.includes("◌"));
+  assert.match(buildPageDocument("n", ""), /vscode-high-contrast \.c-charts-blue[^}]*contrastActiveBorder/);
+});
+
+test("stale poll failure shows an inline notice without an error page", () => {
+  const html = renderBuildPage({ status: "ready", pipelineName: "API", build, stale: true }, now);
+  assert.match(html, /Couldn't refresh — retrying/);
+  assert.ok(!html.includes("Could not load build"));
+});

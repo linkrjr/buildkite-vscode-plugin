@@ -1,0 +1,62 @@
+{
+  "package.json": {
+    "mtime": 1794984713.8657396,
+    "seen": 1794985438.987647,
+    "ast_hash": "6a75ad328812c17ad30b92d2c0863e00",
+    "semantic_hash": "6a75ad328812c17ad30b92d2c0863e00"
+  },
+  "src/buildkite.ts": {
+    "mtime": 1794984713.866717,
+    "seen": 1794985438.987654,
+    "ast_hash": "ab8f0ea609009f1a5a41c5ffed4efae6",
+    "semantic_hash": "ab8f0ea609009f1a5a41c5ffed4efae6"
+  },
+  "src/extension.ts": {
+    "mtime": 1794984713.8671825,
+    "seen": 1794985438.987657,
+    "ast_hash": "d98af6cb311f23e91d98563a6fdac92a",
+    "semantic_hash": "d98af6cb311f23e91d98563a6fdac92a"
+  },
+  "src/git.ts": {
+    "mtime": 1794984713.8674607,
+    "seen": 1794985438.987658,
+    "ast_hash": "0e9ced247bd97560656d130b64d6875a",
+    "semantic_hash": "0e9ced247bd97560656d130b64d6875a"
+  },
+  "src/test/buildkite.test.ts": {
+    "mtime": 1794984713.867705,
+    "seen": 1794985438.987659,
+    "ast_hash": "7be26ed71bd917c9131acfa4fcf5384f",
+    "semantic_hash": "7be26ed71bd917c9131acfa4fcf5384f"
+  },
+  "tsconfig.json": {
+    "mtime": 1794984713.867994,
+    "seen": 1794985438.987659,
+    "ast_hash": "3e0f4a7d4f3f0f34abb852f30b681849",
+    "semantic_hash": "3e0f4a7d4f3f0f34abb852f30b681849"
+  },
+  "README.md": {
+    "mtime": 1794984713.864755,
+    "seen": 1794985438.9876611,
+    "ast_hash": "608a174a5cdf013317cef0edb0649efa",
+    "semantic_hash": "608a174a5cdf013317cef0edb0649efa"
+  },
+  "docs/specs/buildkite-vscode-extension.md": {
+    "mtime": 1794984713.86519,
+    "seen": 1794985438.987662,
+    "ast_hash": "e7fc82057fe60c44cec93bec6b0a5f1a",
+    "semantic_hash": "e7fc82057fe60c44cec93bec6b0a5f1a"
+  },
+  "docs/specs/sidebar-and-build-page-redesign.md": {
+    "mtime": 1794985289.8135397,
+    "seen": 1794985438.987663,
+    "ast_hash": "01d6311d61f4d975ab3ac20c77a363b4",
+    "semantic_hash": "01d6311d61f4d975ab3ac20c77a363b4"
+  },
+  "resources/buildkite.svg": {
+    "mtime": 1794984713.8659725,
+    "seen": 1794985438.987663,
+    "ast_hash": "2ba563707122b8f01c1fd9cf770d5e0e",
+    "semantic_hash": "2ba563707122b8f01c1fd9cf770d5e0e"
+  }
+}

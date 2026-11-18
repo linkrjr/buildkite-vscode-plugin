@@ -1,0 +1,310 @@
+import test from "node:test";
+import assert from "node:assert/strict";
+import { execFileSync } from "node:child_process";
+import { mkdtempSync, readFileSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
+// eslint-disable-next-line @typescript-eslint/no-require-imports
+const Module = require("node:module");
+
+// Minimal hand-written `vscode` mock: just enough for the provider to run.
+class TreeItem { description?: string; contextValue?: string; id?: string; command?: unknown; iconPath?: unknown; tooltip?: unknown; constructor(public label: string, public collapsibleState?: number) {} }
+class ThemeIcon { constructor(public id: string, public color?: unknown) {} }
+class ThemeColor { constructor(public id: string) {} }
+class MarkdownString { constructor(public value: string) {} }
+class EventEmitter<T> { private ls: ((e: T) => void)[] = []; event = (l: (e: T) => void) => { this.ls.push(l); return { dispose() {} }; }; fire(e: T) { this.ls.forEach(l => l(e)); } dispose() {} }
+
+const repo = mkdtempSync(join(tmpdir(), "bk-"));
+execFileSync("git", ["-C", repo, "init", "-q"]);
+execFileSync("git", ["-C", repo, "remote", "add", "origin", "git@github.com:acme/app.git"]);
+
+const secrets = new Map<string, string>();
+let provider: any; let fires = 0; const progress: any[] = [];
+const registered = new Map<string, (...a: any[]) => any>(); const opened: string[] = [];
+const vscodeMock: any = {
+  TreeItem, ThemeIcon, ThemeColor, MarkdownString, EventEmitter,
+  TreeItemCollapsibleState: { None: 0, Collapsed: 1, Expanded: 2 },
+  Uri: { parse: (s: string) => { const u = new URL(s); return { scheme: u.protocol.slice(0, -1), authority: u.host, toString: () => s }; } },
+  workspace: { workspaceFolders: [{ name: "app", uri: { fsPath: repo } }] },
+  commands: { executeCommand: async () => undefined, registerCommand: (id: string, h: any) => { registered.set(id, h); return { dispose() {} }; } },
+  env: { openExternal: async (u: any) => { opened.push(u.toString()); return true; } },
+  window: {
+    withProgress: async (o: any, task: () => Promise<unknown>) => { progress.push(o); return task(); },
+    showInputBox: async () => "tok", showQuickPick: async (items: any[]) => items[0],
+    showInformationMessage() {}, showErrorMessage() {}, showWarningMessage() {},
+    createTreeView: (_id: string, o: any) => { provider = o.treeDataProvider; return { visible: false, onDidChangeVisibility: () => ({ dispose() {} }), dispose() {} }; }
+  }
+};
+const origLoad = Module._load;
+Module._load = function (request: string, ...rest: unknown[]) { return request === "vscode" ? vscodeMock : origLoad.call(this, request, ...rest); };
+
+const json = (body: unknown) => new Response(JSON.stringify(body), { status: 200 });
+const build = (n: number, state = "passed") => ({ number: n, state, branch: "main", message: `m${n}`, commit: "abcdef1234" });
+const pipelines = [{ slug: "app", name: "App", repository: "https://github.com/acme/app.git" }, ...Array.from({ length: 59 }, (_, i) => ({ slug: `p${i}`, name: `P${String(i).padStart(2, "0")}`, repository: `https://github.com/x/p${i}` }))];
+globalThis.fetch = (async (url: string) => {
+  if (url.includes("/builds")) return json(Array.from({ length: 30 }, (_, i) => i === 0 ? { ...build(1, "scheduled"), created_at: new Date(Date.now() - 180_000).toISOString(), web_url: "https://buildkite.com/acme/app/builds/1" } : build(i + 1, "failed")));
+  if (url.includes("/pipelines")) return json(url.includes("page=1") ? pipelines : []);
+  return json([{ slug: "acme", name: "Acme" }]);
+}) as typeof fetch;
+
+// eslint-disable-next-line @typescript-eslint/no-require-imports
+const ext = require("../extension");
+const ctx = { secrets: { get: async (k: string) => secrets.get(k), store: async (k: string, v: string) => { secrets.set(k, v); }, delete: async (k: string) => { secrets.delete(k); } }, subscriptions: [] as any[] };
+const setup = (async () => {
+  ext.activate(ctx);
+  await provider.connect();
+  provider.onDidChangeTreeData(() => { fires++; });
+})();
+
+test("AC6 Current project section is expanded, shows pipeline name, has contextValue and caps builds at 20", async () => {
+  await setup;
+  const [section] = await provider.getChildren();
+  assert.equal(section.label, "Current project");
+  assert.equal(section.collapsibleState, 2);
+  assert.equal(section.description, "App");
+  assert.equal(section.contextValue, "currentProject");
+  const rows = await provider.getChildren(section);
+  assert.equal(rows.length, 20);
+});
+
+test("AC7/AC10 My Pipelines count uses the unfiltered total and the current pipeline is starred", async () => {
+  await setup;
+  provider.state.search = "P01";
+  const nodes = await provider.getChildren();
+  assert.equal(nodes[1].label, "My Pipelines (60)");
+  const rows = await provider.getChildren(nodes[1]);
+  assert.deepEqual(rows.map((r: any) => r.label), ["P01"]);
+  provider.state.search = "";
+  const all = await provider.getChildren(nodes[1]);
+  assert.equal(all[0].label, "App ★");
+  assert.equal(all.at(-1).label, "Load more");
+});
+
+test("AC6 no-match section shows muted row with tooltip", async () => {
+  await setup;
+  provider.state.current = undefined;
+  provider.state.pipelines = [];
+  const [section] = await provider.getChildren();
+  assert.equal(section.contextValue, "currentProjectNoMatch");
+  const [row] = await provider.getChildren(section);
+  assert.equal(row.label, "No pipeline uses this repository");
+  assert.ok(row.tooltip);
+  assert.equal((row.iconPath as ThemeIcon).id, "info");
+  await provider.refresh();
+});
+
+test("AC16 loading a pipeline's builds fires a tree change so its icon updates", async () => {
+  await setup;
+  const nodes = await provider.getChildren();
+  const rows = await provider.getChildren(nodes[1]);
+  const p0 = rows.find((r: any) => r.label === "P00");
+  assert.equal((p0.iconPath as ThemeIcon).id, "package");
+  const before = fires;
+  await provider.getChildren(p0);
+  assert.ok(fires > before);
+  const after = (await provider.getChildren(nodes[1])).find((r: any) => r.label === "P00");
+  assert.notEqual((after.iconPath as ThemeIcon).id, "package");
+});
+
+test("AC8 Refresh is inline on Current project and My Pipelines section rows", () => {
+  const menus = JSON.parse(readFileSync(join(__dirname, "..", "..", "package.json"), "utf8")).contributes.menus["view/item/context"];
+  const refresh = menus.filter((m: any) => m.command === "buildkite.refresh");
+  assert.ok(refresh.some((m: any) => /currentProject/.test(m.when) && /currentProjectNoMatch/.test(m.when) && m.group === "inline"));
+  assert.ok(refresh.some((m: any) => /myPipelines/.test(m.when) && m.group === "inline"));
+});
+
+test("a stale render awaiting git does not overwrite a match committed by a concurrent refresh", async () => {
+  await setup;
+  await provider.refresh();
+  const fresh = provider.state.current;
+  assert.equal(fresh.kind, "match");
+  const stalePipelines = provider.state.pipelines;
+  provider.state.current = undefined;
+  provider.state.pipelines = [];
+  const stale = provider.currentMatch(); // reads [] then awaits git
+  provider.state.pipelines = stalePipelines;
+  provider.state.current = fresh; // refresh finishes meanwhile
+  await stale;
+  assert.equal(provider.state.current, fresh);
+});
+
+test("disconnect drops the cached current match", async () => {
+  await setup;
+  await provider.refresh();
+  assert.ok(provider.state.current);
+  await provider.disconnect();
+  assert.equal(provider.state.current, undefined);
+  await provider.connect();
+});
+
+test("changing organization drops the cached current match until refresh recomputes it", async () => {
+  await setup;
+  await provider.refresh();
+  assert.equal(provider.state.current.kind, "match");
+  const seen: unknown[] = [];
+  const orig = provider.refresh.bind(provider);
+  provider.refresh = async () => { seen.push(provider.state.current); await orig(); };
+  await provider.chooseOrganization();
+  provider.refresh = orig;
+  assert.deepEqual(seen, [undefined]);
+  assert.equal(provider.state.current.kind, "match");
+});
+
+test("AC11 filter shows query with matches of total, Clear filter restores the list", async () => {
+  await setup;
+  provider.state.search = "P01";
+  const nodes = await provider.getChildren();
+  assert.equal(nodes[1].description, "“P01” · 1 of 60");
+  assert.equal(nodes[1].contextValue, "myPipelinesFiltered");
+  provider.clearFilter();
+  const cleared = await provider.getChildren();
+  assert.equal(cleared[1].description, undefined);
+  assert.equal(cleared[1].contextValue, "myPipelines");
+  assert.equal((await provider.getChildren(cleared[1])).length, 51);
+});
+
+test("AC11 no matches shows a muted row; menus swap Search for Clear filter", async () => {
+  await setup;
+  provider.state.search = "zzz";
+  const nodes = await provider.getChildren();
+  const [row] = await provider.getChildren(nodes[1]);
+  assert.equal(row.label, "No pipelines match “zzz”");
+  provider.clearFilter();
+  const menus = JSON.parse(readFileSync(join(__dirname, "..", "..", "package.json"), "utf8")).contributes.menus["view/item/context"];
+  assert.ok(menus.some((m: any) => m.command === "buildkite.searchPipelines" && m.when.endsWith("viewItem == myPipelines")));
+  assert.ok(menus.some((m: any) => m.command === "buildkite.clearFilter" && m.when.endsWith("viewItem == myPipelinesFiltered")));
+});
+
+test("AC17 refresh runs inside the view progress and keeps loaded rows", async () => {
+  await setup;
+  progress.length = 0;
+  let during: any[] = [];
+  provider.onDidChangeTreeData(async () => { if (provider.state.loading) during = await provider.getChildren(); });
+  await provider.refresh();
+  assert.deepEqual(progress[0].location, { viewId: "buildkite.explorer" });
+  assert.equal(during[0].label, "Current project");
+  assert.ok(during.every((n: any) => n.label !== "Refreshing Buildkite data…"));
+});
+
+test("AC18 failed refresh shows one red error row with Retry that clears after success", async () => {
+  await setup;
+  const orig = globalThis.fetch;
+  globalThis.fetch = (async () => new Response("{}", { status: 500 })) as typeof fetch;
+  await provider.refresh();
+  globalThis.fetch = orig;
+  let nodes = await provider.getChildren();
+  assert.equal(nodes.filter((n: any) => n.contextValue === "errorRow").length, 1);
+  assert.equal(nodes[0].contextValue, "errorRow");
+  assert.equal((nodes[0].iconPath as ThemeIcon).id, "error");
+  assert.equal((nodes[0].iconPath as any).color.id, "errorForeground");
+  const menus = JSON.parse(readFileSync(join(__dirname, "..", "..", "package.json"), "utf8")).contributes.menus["view/item/context"];
+  assert.ok(menus.some((m: any) => m.command === "buildkite.retry" && /errorRow/.test(m.when) && m.group === "inline"));
+  await provider.refresh();
+  nodes = await provider.getChildren();
+  assert.ok(nodes.every((n: any) => n.contextValue !== "errorRow"));
+});
+
+test("AC18 a failed builds load surfaces through the error row, not 'No recent builds'", async () => {
+  await setup;
+  await provider.refresh();
+  provider.state.pipelineBuilds.clear();
+  const orig = globalThis.fetch;
+  globalThis.fetch = (async () => new Response("{}", { status: 500 })) as typeof fetch;
+  const nodes = await provider.getChildren();
+  const rows = await provider.getChildren(nodes.find((n: any) => n.label.startsWith("My Pipelines")));
+  const before = fires;
+  const children = await provider.getChildren(rows[0]);
+  globalThis.fetch = orig;
+  assert.deepEqual(children, []);
+  assert.ok(fires > before);
+  assert.equal((await provider.getChildren())[0].contextValue, "errorRow");
+  await provider.refresh();
+});
+
+test("AC8 Trigger build is inline only on a matching Current project row", () => {
+  const menus = JSON.parse(readFileSync(join(__dirname, "..", "..", "package.json"), "utf8")).contributes.menus["view/item/context"];
+  const t = menus.filter((m: any) => m.command === "buildkite.triggerCurrentProject");
+  assert.equal(t.length, 1);
+  assert.match(t[0].when, /viewItem == currentProject$/);
+  assert.equal(t[0].group, "inline");
+});
+
+async function runQuick(branchInit: string[], answers: (string | undefined)[]) {
+  const w = vscodeMock.window; const saved = { ...w };
+  const boxes: any[] = []; const warnings: string[] = []; const picks: unknown[] = []; const posts: any[] = [];
+  let i = 0;
+  w.showInputBox = async (o: any) => { boxes.push(o); return answers[i++]; };
+  w.showQuickPick = async (...a: unknown[]) => { picks.push(a); return undefined; };
+  w.showWarningMessage = async (m: string) => { warnings.push(m); return "Trigger build"; };
+  const savedFetch = globalThis.fetch;
+  globalThis.fetch = (async (url: string, init?: any) => { if (init?.method === "POST") { posts.push(JSON.parse(init.body)); return json({ number: 1 }); } return savedFetch(url, init); }) as typeof fetch;
+  try {
+    if (branchInit.length) execFileSync("git", ["-C", repo, ...branchInit], { stdio: "pipe" });
+    await provider.refresh(); await provider.triggerCurrent();
+  } finally { Object.assign(w, saved); globalThis.fetch = savedFetch; }
+  return { boxes, warnings, picks, posts };
+}
+
+test("AC9 quick trigger skips pipeline pick, pre-fills the current branch and keeps masked confirmation", async () => {
+  await setup;
+  const r = await runQuick(["checkout", "-q", "-B", "feature/q"], ["feature/q", "msg", "SECRET=hunter2"]);
+  assert.equal(r.picks.length, 0);
+  assert.equal(r.boxes[0].value, "feature/q");
+  assert.match(r.boxes[0].title, /App/);
+  assert.equal(r.boxes[2].password, true);
+  assert.match(r.warnings[0], /SECRET=••••••/);
+  assert.ok(!r.warnings[0].includes("hunter2"));
+  assert.equal(r.posts.length, 1);
+  assert.equal(r.posts[0].branch, "feature/q");
+});
+
+test("AC9 quick trigger pre-fills empty branch on detached HEAD", async () => {
+  await setup;
+  execFileSync("git", ["-C", repo, "-c", "user.name=t", "-c", "user.email=t@t", "commit", "-q", "--allow-empty", "-m", "c"], { stdio: "pipe" });
+  const r = await runQuick(["checkout", "-q", "--detach"], [undefined]);
+  assert.equal(r.boxes[0].value, "");
+  assert.equal(r.posts.length, 0);
+});
+
+test("AC15 build rows have no collapsible state and click opens the build page with pipeline and number", async () => {
+  await setup;
+  const [section] = await provider.getChildren();
+  const [row] = await provider.getChildren(section);
+  assert.equal(row.collapsibleState, 0);
+  assert.equal(row.contextValue, "build");
+  assert.equal(row.command.command, "buildkite.openBuildPage");
+  assert.deepEqual(row.command.arguments, [{ pipeline: { slug: "app", name: "App" }, number: 1 }]);
+  assert.deepEqual(await provider.getChildren(row), []);
+});
+
+test("AC15 old expand-build path is gone", () => {
+  assert.equal(registered.has("buildkite.expandBuild"), false);
+  const pkg = JSON.parse(readFileSync(join(__dirname, "..", "..", "package.json"), "utf8"));
+  assert.ok(!pkg.contributes.commands.some((c: any) => c.command === "buildkite.expandBuild"));
+});
+
+test("AC15 inline link-external button on build rows runs openBuild", () => {
+  const pkg = JSON.parse(readFileSync(join(__dirname, "..", "..", "package.json"), "utf8"));
+  const cmd = pkg.contributes.commands.find((c: any) => c.command === "buildkite.openBuild");
+  assert.equal(cmd.icon, "$(link-external)");
+  assert.ok(pkg.contributes.menus["view/item/context"].some((m: any) => m.command === "buildkite.openBuild" && /viewItem == build\b/.test(m.when) && m.group === "inline"));
+});
+
+test("AC15 openBuild opens the row's https buildkite URL and refuses others", async () => {
+  await setup;
+  const [section] = await provider.getChildren();
+  const [row] = await provider.getChildren(section);
+  const open = registered.get("buildkite.openBuild")!;
+  opened.length = 0;
+  await open(row);
+  assert.deepEqual(opened, ["https://buildkite.com/acme/app/builds/1"]);
+  await open("https://evil.example/x"); await open("http://buildkite.com/x"); await open({ data: { build: {} } });
+  assert.equal(opened.length, 1);
+});
+
+test("AC12 a build without started_at keeps created_at so its description shows relative time", async () => {
+  await setup;
+  const [section] = await provider.getChildren();
+  const [row] = await provider.getChildren(section);
+  assert.equal(row.description, "main · 3m ago");
+});

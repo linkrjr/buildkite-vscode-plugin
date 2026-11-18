@@ -178,7 +178,7 @@ test("AC17 refresh runs inside the view progress and keeps loaded rows", async (
   await setup;
   progress.length = 0;
   let during: any[] = [];
-  const unsub = provider.onDidChangeTreeData(async () => { if (provider.state.loading) during = await provider.getChildren(); });
+  provider.onDidChangeTreeData(async () => { if (provider.state.loading) during = await provider.getChildren(); });
   await provider.refresh();
   assert.deepEqual(progress[0].location, { viewId: "buildkite.explorer" });
   assert.equal(during[0].label, "Current project");

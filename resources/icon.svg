@@ -1,0 +1,9 @@
+<svg width="128" height="128" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+  <!-- Marketplace icon source; render to icon.png (128x128) since the Marketplace rejects SVG icons. -->
+  <rect width="24" height="24" rx="5" fill="#1B2A33"/>
+  <g transform="translate(12 12) scale(0.78) translate(-12 -12)">
+    <path fill="#3EE6A0" d="M12 2.5 20 7l-8 4.5L4 7z"/>
+    <path fill="#14CC80" d="M4 9.6l7 3.9v8L4 17.6z"/>
+    <path fill="#0E9960" d="M13 13.5l7-3.9v8L13 21.5z"/>
+  </g>
+</svg>

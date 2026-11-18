@@ -5,6 +5,7 @@
   "version": "0.0.1",
   "publisher": "buildkite-community",
   "license": "MIT",
+  "icon": "resources/icon.png",
   "repository": { "type": "git", "url": "https://github.com/linkrjr/buildkite-vscode-plugin.git" },
   "engines": { "vscode": "^1.95.0" },
   "categories": ["Other"],

@@ -14,3 +14,4 @@ out/test/**
 **/*.map
 .gitignore
 *.vsix
+resources/icon.svg

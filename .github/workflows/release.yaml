@@ -19,6 +19,7 @@ jobs:
     runs-on: ubuntu-latest
     permissions:
       contents: write
+      id-token: write # OIDC trusted publishing (Marketplace and Open VSX)
     steps:
       - uses: actions/checkout@v4
         with:
@@ -45,25 +46,28 @@ jobs:
 
       - name: Package
         if: steps.version.outputs.skip != 'true'
-        run: npx --yes @vscode/vsce@3 package --out "buildkite-vscode-${{ steps.version.outputs.version }}.vsix"
+        run: npx --yes @vscode/vsce@4 package --out "buildkite-vscode-${{ steps.version.outputs.version }}.vsix"
 
       # --skip-duplicate makes re-runs safe if a later step failed.
+      # Auth is OIDC trusted publishing: needs a policy on the publisher's
+      # Trusted Publishing page naming this repo and release.yaml.
       - name: Publish to VS Code Marketplace
         if: steps.version.outputs.skip != 'true'
-        env:
-          VSCE_PAT: ${{ secrets.VSCE_PAT }}
-        run: npx --yes @vscode/vsce@3 publish --skip-duplicate --packagePath buildkite-vscode-*.vsix
+        run: npx --yes @vscode/vsce@4 publish --oidc --skip-duplicate --packagePath buildkite-vscode-*.vsix
 
+      # Open VSX trusted publishing only works once the extension exists, so
+      # the first version needs an OVSX_PAT secret; delete it afterwards.
       - name: Publish to Open VSX
         if: steps.version.outputs.skip != 'true'
         env:
           OVSX_PAT: ${{ secrets.OVSX_PAT }}
         run: |
-          if [ -z "$OVSX_PAT" ]; then
-            echo "OVSX_PAT not set; skipping Open VSX."
-            exit 0
+          if [ -n "$OVSX_PAT" ]; then
+            npx --yes ovsx@1 publish buildkite-vscode-*.vsix --skip-duplicate
+          else
+            unset OVSX_PAT
+            npx --yes ovsx@1 publish buildkite-vscode-*.vsix --skip-duplicate --trusted-publishing
           fi
-          npx --yes ovsx@0 publish buildkite-vscode-*.vsix --skip-duplicate
 
       # Runs last: the tag is what marks a version as released.
       - name: Create GitHub release

@@ -1,6 +1,7 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { viewState, viewSubtitle, TOKEN_PAGE_URL } from "../viewstate";
+import { viewState, viewSubtitle, isAuthFailure, TOKEN_PAGE_URL } from "../viewstate";
+import { BuildkiteError } from "../buildkite";
 
 test("AC1 no token is disconnected", () => {
   assert.equal(viewState({ hasToken: false, hasOrg: false, authError: false }), "disconnected");
@@ -25,4 +26,12 @@ test("AC4 subtitle is organization alone without folder", () => {
 });
 test("AC1 token page link", () => {
   assert.equal(TOKEN_PAGE_URL, "https://buildkite.com/user/api-access-tokens");
+});
+test("AC3 authentication BuildkiteError is an auth failure", () => {
+  assert.equal(isAuthFailure(new BuildkiteError("authentication")), true);
+});
+test("AC3 other errors are not auth failures", () => {
+  assert.equal(isAuthFailure(new BuildkiteError("network")), false);
+  assert.equal(isAuthFailure(new BuildkiteError("authorization")), false);
+  assert.equal(isAuthFailure(new Error("authentication")), false);
 });

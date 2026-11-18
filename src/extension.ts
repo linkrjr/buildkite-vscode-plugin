@@ -1,7 +1,7 @@
 import * as vscode from "vscode";
 import { BuildkiteClient, BuildkiteError, Build, Job, Organization, Pipeline, normalizeRepository, pipelineRepository } from "./buildkite";
 import { originRemote } from "./git";
-import { TOKEN_PAGE_URL, viewState, viewSubtitle } from "./viewstate";
+import { TOKEN_PAGE_URL, isAuthFailure, viewState, viewSubtitle } from "./viewstate";
 
 const TOKEN_KEY = "buildkite.userToken";
 type NodeKind = "info" | "action" | "pipelines" | "pipeline" | "build" | "job";
@@ -37,7 +37,7 @@ class BuildkiteProvider implements vscode.TreeDataProvider<Node>, vscode.Disposa
     await vscode.commands.executeCommand("setContext", "buildkite.workspaceFolderCount", (vscode.workspace.workspaceFolders ?? []).length);
     if (this.view) this.view.description = state === "connected" && this.state.org ? viewSubtitle(this.state.org.name, this.state.folder?.name) : undefined;
   }
-  private fail(e: unknown): void { this.state.error = this.message(e); if (e instanceof BuildkiteError && e.kind === "authentication") { this.state.org = undefined; this.state.authError = true; } }
+  private fail(e: unknown): void { this.state.error = this.message(e); if (isAuthFailure(e)) { this.state.org = undefined; this.state.authError = true; } }
   setVisible(visible: boolean): void { this.visible = visible; if (visible && !this.refreshTimer) this.refreshTimer = setInterval(() => { void this.refresh(); }, 60_000); if (!visible && this.refreshTimer) { clearInterval(this.refreshTimer); this.refreshTimer = undefined; } if (visible) void this.refresh(); }
   async getChildren(element?: Node): Promise<Node[]> {
     if (!element) return this.root();

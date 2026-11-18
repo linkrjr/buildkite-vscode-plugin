@@ -13,8 +13,8 @@
     "views": { "buildkite": [{ "id": "buildkite.explorer", "name": "Buildkite" }] },
     "viewsWelcome": [
       { "view": "buildkite.explorer", "when": "buildkite.state == disconnected", "contents": "Connect Buildkite with a user API token to browse and trigger your pipelines.\n[Connect Buildkite](command:buildkite.connect)\n[Create an API access token](command:buildkite.openTokenPage)" },
-      { "view": "buildkite.explorer", "when": "buildkite.state == noOrganization", "contents": "Choose an organization to continue.\n[Select organization](command:buildkite.changeOrganization)\n[Replace token](command:buildkite.replaceToken)" },
-      { "view": "buildkite.explorer", "when": "buildkite.state == authError", "contents": "Buildkite could not authenticate your token. It may have expired or been revoked.\n[Replace token](command:buildkite.replaceToken)" }
+      { "view": "buildkite.explorer", "when": "buildkite.state == noOrganization", "contents": "Choose an organization to continue.\n[Select organization](command:buildkite.changeOrganization)\n[Replace token](command:buildkite.replaceToken)\n[Disconnect](command:buildkite.disconnect)" },
+      { "view": "buildkite.explorer", "when": "buildkite.state == authError", "contents": "Buildkite could not authenticate your token. It may have expired or been revoked.\n[Replace token](command:buildkite.replaceToken)\n[Disconnect](command:buildkite.disconnect)" }
     ],
     "commands": [
       { "command": "buildkite.connect", "title": "Buildkite: Connect" },
@@ -34,6 +34,9 @@
       { "id": "buildkite.titleActions", "label": "...", "icon": "$(ellipsis)" }
     ],
     "menus": {
+      "commandPalette": [
+        { "command": "buildkite.openTokenPage", "when": "false" }
+      ],
       "view/title": [
         { "submenu": "buildkite.titleActions", "when": "view == buildkite.explorer && buildkite.state == connected", "group": "navigation" }
       ],

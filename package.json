@@ -1,5 +1,5 @@
 {
-  "name": "buildkite-vscode",
+  "name": "buildkite-pipeline-explorer",
   "displayName": "Buildkite",
   "description": "Securely browse and trigger authorized Buildkite pipelines.",
   "version": "1.0.0",

@@ -46,14 +46,14 @@ jobs:
 
       - name: Package
         if: steps.version.outputs.skip != 'true'
-        run: npx --yes @vscode/vsce@4 package --out "buildkite-vscode-${{ steps.version.outputs.version }}.vsix"
+        run: npx --yes @vscode/vsce@4 package --out "buildkite-pipeline-explorer-${{ steps.version.outputs.version }}.vsix"
 
       # --skip-duplicate makes re-runs safe if a later step failed.
       # Auth is OIDC trusted publishing: needs a policy on the publisher's
       # Trusted Publishing page naming this repo and release.yaml.
       - name: Publish to VS Code Marketplace
         if: steps.version.outputs.skip != 'true'
-        run: npx --yes @vscode/vsce@4 publish --oidc --skip-duplicate --packagePath buildkite-vscode-*.vsix
+        run: npx --yes @vscode/vsce@4 publish --oidc --skip-duplicate --packagePath buildkite-pipeline-explorer-*.vsix
 
       # Open VSX trusted publishing only works once the extension exists, so
       # the first version needs an OVSX_PAT secret; delete it afterwards.
@@ -63,10 +63,10 @@ jobs:
           OVSX_PAT: ${{ secrets.OVSX_PAT }}
         run: |
           if [ -n "$OVSX_PAT" ]; then
-            npx --yes ovsx@1 publish buildkite-vscode-*.vsix --skip-duplicate
+            npx --yes ovsx@1 publish buildkite-pipeline-explorer-*.vsix --skip-duplicate
           else
             unset OVSX_PAT
-            npx --yes ovsx@1 publish buildkite-vscode-*.vsix --skip-duplicate --trusted-publishing
+            npx --yes ovsx@1 publish buildkite-pipeline-explorer-*.vsix --skip-duplicate --trusted-publishing
           fi
 
       # Runs last: the tag is what marks a version as released.
@@ -75,5 +75,5 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
-          gh release create "v${{ steps.version.outputs.version }}" buildkite-vscode-*.vsix \
+          gh release create "v${{ steps.version.outputs.version }}" buildkite-pipeline-explorer-*.vsix \
             --target "$GITHUB_SHA" --title "v${{ steps.version.outputs.version }}" --generate-notes

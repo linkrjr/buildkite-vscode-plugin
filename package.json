@@ -29,6 +29,7 @@
       { "command": "buildkite.clearFilter", "title": "Buildkite: Clear filter", "icon": "$(close)" },
       { "command": "buildkite.loadMore", "title": "Buildkite: Load more pipelines" },
       { "command": "buildkite.triggerBuild", "title": "Buildkite: Trigger build", "icon": "$(play)" },
+      { "command": "buildkite.triggerCurrentProject", "title": "Buildkite: Trigger build for current project", "icon": "$(play)" },
       { "command": "buildkite.openBuild", "title": "Buildkite: Open build in browser" },
       { "command": "buildkite.openBuildPage", "title": "Buildkite: Open build page" },
       { "command": "buildkite.expandBuild", "title": "Buildkite: Show build details" }
@@ -39,7 +40,8 @@
     "menus": {
       "commandPalette": [
         { "command": "buildkite.openTokenPage", "when": "false" },
-        { "command": "buildkite.openBuildPage", "when": "false" }
+        { "command": "buildkite.openBuildPage", "when": "false" },
+        { "command": "buildkite.triggerCurrentProject", "when": "false" }
       ],
       "view/title": [
         { "submenu": "buildkite.titleActions", "when": "view == buildkite.explorer && buildkite.state == connected", "group": "navigation" }
@@ -52,6 +54,7 @@
       ],
       "view/item/context": [
         { "command": "buildkite.refresh", "when": "view == buildkite.explorer && (viewItem == currentProject || viewItem == currentProjectNoMatch)", "group": "inline" },
+        { "command": "buildkite.triggerCurrentProject", "when": "view == buildkite.explorer && viewItem == currentProject", "group": "inline" },
         { "command": "buildkite.refresh", "when": "view == buildkite.explorer && viewItem =~ /^myPipelines/", "group": "inline" },
         { "command": "buildkite.triggerBuild", "when": "view == buildkite.explorer && viewItem =~ /^myPipelines/", "group": "inline" },
         { "command": "buildkite.searchPipelines", "when": "view == buildkite.explorer && viewItem == myPipelines", "group": "inline" },

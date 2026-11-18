@@ -4,3 +4,7 @@ test/**
 docs/**
 *.ts
 tsconfig.json
+graphify-out/**
+intent/**
+tmp/**
+out/test/**

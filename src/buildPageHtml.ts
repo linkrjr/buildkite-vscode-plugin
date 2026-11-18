@@ -53,7 +53,7 @@ export function renderBuildPage(model: BuildPageModel, now: Date): string {
   const jobList = jobs.length ? `<ul class="jobs">${jobs.map((j, i) => jobRow(j, i, now)).join("")}</ul>` : `<div class="empty">No jobs yet</div>`;
   const notice = model.stale ? `<p class="notice" role="status">Couldn't refresh — retrying</p>` : "";
   const foot = finished ? "" : `<p class="muted foot"><span class="icon spin" aria-hidden="true">${SPINNER}</span> Refreshes every 10 s while this tab is visible</p>`;
-  return `<header><div class="row1"><h1>${escapeHtml(model.pipelineName)} <span class="muted">#${b.number}</span></h1><div class="actions"><button class="btn secondary" data-action="refresh"${model.refreshing ? ' aria-busy="true" disabled' : ""}>${model.refreshing ? '<span class="icon spin" aria-hidden="true">${SPINNER}</span> ' : ""}Refresh</button><button class="btn primary" data-action="openBuild">Open in Buildkite ↗</button></div></div>
+  return `<header><div class="row1"><h1>${escapeHtml(model.pipelineName)} <span class="muted">#${b.number}</span></h1><div class="actions"><button class="btn secondary" data-action="refresh"${model.refreshing ? ' aria-busy="true" disabled' : ""}>${model.refreshing ? `<span class="icon spin" aria-hidden="true">${SPINNER}</span> ` : ""}Refresh</button><button class="btn primary" data-action="openBuild">Open in Buildkite ↗</button></div></div>
 <div class="row2"><span class="badge s-${escapeHtml(statusIcon(b.state).color.replace(/\./g, "-"))}">${icon(b.state)} ${label}</span>${meta}</div>
 <p class="message">${escapeHtml((b.message ?? "").trim())}</p><p class="muted">${escapeHtml(timing)}</p>${notice}</header>
 <section><h2>Jobs <span class="chip">${jobs.length}</span></h2>${jobList}${foot}</section>`;

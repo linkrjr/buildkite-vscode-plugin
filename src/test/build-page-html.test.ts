@@ -80,3 +80,10 @@ test("stale poll failure shows an inline notice without an error page", () => {
   assert.match(html, /Couldn't refresh — retrying/);
   assert.ok(!html.includes("Could not load build"));
 });
+
+test("refreshing Refresh button renders the spinner svg, not a literal placeholder", () => {
+  const html = renderBuildPage({ status: "ready", pipelineName: "API", build, refreshing: true } as never, now);
+  const btn = html.slice(html.indexOf('data-action="refresh"'), html.indexOf('data-action="openBuild"'));
+  assert.ok(btn.includes("<svg"));
+  assert.ok(!html.includes("${SPINNER}"));
+});

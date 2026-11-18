@@ -1,0 +1,15 @@
+{
+  "5": "extension.test.ts",
+  "6": "Intent: Buildkite-style Activity Bar icon",
+  "7": "Intent: Build page webview",
+  "9": "Intent: Build rows open the build page",
+  "10": "Intent: Quick trigger from the Current project section",
+  "11": "Intent: Presentation helpers for build status and times",
+  "12": "Intent: Search filter display, progress bar and error row",
+  "13": "Intent: Current project and My Pipelines sections with styled build rows",
+  "14": "Intent: Welcome screens, view subtitle and overflow menu",
+  "15": "presentation.ts",
+  "16": "Intent: Exclude tooling folders from the packaged extension",
+  "17": "build-page.test.ts",
+  "19": "BuildPage"
+}

@@ -1,6 +1,6 @@
 {
   "name": "buildkite-pipeline-explorer",
-  "displayName": "Buildkite",
+  "displayName": "Buildkite Pipeline Explorer",
   "description": "Securely browse and trigger authorized Buildkite pipelines.",
   "version": "1.0.0",
   "publisher": "linkrjr",

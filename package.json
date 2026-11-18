@@ -30,9 +30,8 @@
       { "command": "buildkite.loadMore", "title": "Buildkite: Load more pipelines" },
       { "command": "buildkite.triggerBuild", "title": "Buildkite: Trigger build", "icon": "$(play)" },
       { "command": "buildkite.triggerCurrentProject", "title": "Buildkite: Trigger build for current project", "icon": "$(play)" },
-      { "command": "buildkite.openBuild", "title": "Buildkite: Open build in browser" },
-      { "command": "buildkite.openBuildPage", "title": "Buildkite: Open build page" },
-      { "command": "buildkite.expandBuild", "title": "Buildkite: Show build details" }
+      { "command": "buildkite.openBuild", "title": "Buildkite: Open build in browser", "icon": "$(link-external)" },
+      { "command": "buildkite.openBuildPage", "title": "Buildkite: Open build page" }
     ],
     "submenus": [
       { "id": "buildkite.titleActions", "label": "...", "icon": "$(ellipsis)" }
@@ -59,7 +58,8 @@
         { "command": "buildkite.triggerBuild", "when": "view == buildkite.explorer && viewItem =~ /^myPipelines/", "group": "inline" },
         { "command": "buildkite.searchPipelines", "when": "view == buildkite.explorer && viewItem == myPipelines", "group": "inline" },
         { "command": "buildkite.clearFilter", "when": "view == buildkite.explorer && viewItem == myPipelinesFiltered", "group": "inline" },
-        { "command": "buildkite.retry", "when": "view == buildkite.explorer && viewItem == errorRow", "group": "inline" }
+        { "command": "buildkite.retry", "when": "view == buildkite.explorer && viewItem == errorRow", "group": "inline" },
+        { "command": "buildkite.openBuild", "when": "view == buildkite.explorer && viewItem == build", "group": "inline" }
       ]
     }
   },

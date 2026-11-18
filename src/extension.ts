@@ -1,6 +1,6 @@
 import * as vscode from "vscode";
 import { BuildkiteClient, BuildkiteError, Build, Job, Organization, Pipeline, pipelineRepository } from "./buildkite";
-import { originRemote } from "./git";
+import { currentBranch, originRemote } from "./git";
 import { buildDescription, buildLabel, buildTooltip, statusIcon } from "./presentation";
 import { currentProject, myPipelinesLabel, pipelineIcon, pipelineLabel, type CurrentProject } from "./tree";
 import { TOKEN_PAGE_URL, isAuthFailure, viewState, viewSubtitle } from "./viewstate";
@@ -178,10 +178,17 @@ class BuildkiteProvider implements vscode.TreeDataProvider<Node>, vscode.Disposa
   async expandBuild(target: BuildTarget): Promise<void> { const client = await this.client(); if (!client || !this.state.org) return; try { this.state.buildDetails.set(this.buildKey(target), safeBuild(await client.build(this.state.org.slug, target.pipeline.slug, target.build.number))); this.changed.fire(undefined); } catch (e) { vscode.window.showErrorMessage(this.message(e)); } }
   get organizationSlug(): string | undefined { return this.state.org?.slug; }
   async fetchBuild(organizationSlug: string, pipelineSlug: string, number: number): Promise<Build> { const client = await this.client(); if (!client) throw new BuildkiteError("authentication"); return safeBuild(await client.build(organizationSlug, pipelineSlug, number)); }
-  async trigger(): Promise<void> {
+  /** Quick trigger from Current project: preset pipeline, branch pre-filled from the folder's Git branch (empty if detached/unknown). */
+  async triggerCurrent(): Promise<void> {
+    const current = await this.currentMatch();
+    if (current.kind !== "match") { vscode.window.showWarningMessage("No Buildkite pipeline matches this project."); return; }
+    const folder = this.state.folder;
+    await this.trigger({ pipeline: current.pipeline, branch: (folder ? await currentBranch(folder.uri.fsPath) : undefined) ?? "" });
+  }
+  async trigger(preset?: { pipeline: Pipeline; branch: string }): Promise<void> {
     const pipelines = this.state.pipelines; if (!this.state.org || !pipelines.length) { vscode.window.showWarningMessage("No authorized Buildkite pipeline is available."); return; }
-    const pipeline = await vscode.window.showQuickPick(pipelines.map(p => ({ label: p.name, description: p.slug, pipeline: p })), { placeHolder: "Choose an authorized pipeline" }); if (!pipeline) return;
-    const ref = await vscode.window.showInputBox({ prompt: "Branch or commit", validateInput: v => v.trim() ? undefined : "A branch or commit is required." }); if (!ref?.trim()) return;
+    const pipeline = preset ? { label: preset.pipeline.name, pipeline: preset.pipeline } : await vscode.window.showQuickPick(pipelines.map(p => ({ label: p.name, description: p.slug, pipeline: p })), { placeHolder: "Choose an authorized pipeline" }); if (!pipeline) return;
+    const ref = await vscode.window.showInputBox({ ...(preset ? { title: `Trigger build · ${preset.pipeline.name}`, prompt: "Branch to build", value: preset.branch, placeHolder: "main" } : { prompt: "Branch or commit" }), validateInput: v => v.trim() ? undefined : "A branch or commit is required." }); if (!ref?.trim()) return;
     const message = await vscode.window.showInputBox({ prompt: "Optional build message" }); if (message === undefined) return;
     const envText = await vscode.window.showInputBox({ prompt: "Optional environment variables (KEY=value, one per line)", password: true }); if (envText === undefined) return;
     const env: Record<string, string> = {}; for (const line of envText.split(/\r?\n/)) { if (!line) continue; const i = line.indexOf("="); if (i < 1) { vscode.window.showWarningMessage("Environment variables must use KEY=value."); return; } env[line.slice(0, i)] = line.slice(i + 1); }
@@ -204,7 +211,7 @@ export function activate(context: vscode.ExtensionContext): void {
   context.subscriptions.push(provider, buildPage, view, view.onDidChangeVisibility(() => provider.setVisible(view.visible)));
   provider.view = view;
   provider.setVisible(view.visible);
-  const commands: [string, (...args: never[]) => unknown][] = [["buildkite.connect", () => provider.connect()], ["buildkite.replaceToken", () => provider.replaceToken()], ["buildkite.disconnect", () => provider.disconnect()], ["buildkite.changeOrganization", () => provider.chooseOrganization()], ["buildkite.openBuildPage", (target: BuildPageTarget) => { const org = provider.organizationSlug; if (org) buildPage.show(target, org); }], ["buildkite.changeFolder", () => provider.chooseFolder()], ["buildkite.openTokenPage", () => vscode.env.openExternal(vscode.Uri.parse(TOKEN_PAGE_URL))], ["buildkite.refresh", () => provider.refresh()], ["buildkite.searchPipelines", () => provider.search()], ["buildkite.retry", () => provider.refresh()], ["buildkite.clearFilter", () => provider.clearFilter()], ["buildkite.loadMore", () => provider.loadMore()], ["buildkite.triggerBuild", () => provider.trigger()], ["buildkite.expandBuild", (target: BuildTarget) => provider.expandBuild(target)], ["buildkite.openBuild", openUrl]];
+  const commands: [string, (...args: never[]) => unknown][] = [["buildkite.connect", () => provider.connect()], ["buildkite.replaceToken", () => provider.replaceToken()], ["buildkite.disconnect", () => provider.disconnect()], ["buildkite.changeOrganization", () => provider.chooseOrganization()], ["buildkite.openBuildPage", (target: BuildPageTarget) => { const org = provider.organizationSlug; if (org) buildPage.show(target, org); }], ["buildkite.changeFolder", () => provider.chooseFolder()], ["buildkite.openTokenPage", () => vscode.env.openExternal(vscode.Uri.parse(TOKEN_PAGE_URL))], ["buildkite.refresh", () => provider.refresh()], ["buildkite.searchPipelines", () => provider.search()], ["buildkite.retry", () => provider.refresh()], ["buildkite.clearFilter", () => provider.clearFilter()], ["buildkite.loadMore", () => provider.loadMore()], ["buildkite.triggerBuild", () => provider.trigger()], ["buildkite.triggerCurrentProject", () => provider.triggerCurrent()], ["buildkite.expandBuild", (target: BuildTarget) => provider.expandBuild(target)], ["buildkite.openBuild", openUrl]];
   commands.forEach(([id, handler]) => context.subscriptions.push(vscode.commands.registerCommand(id, handler)));
 }
 export function deactivate(): void {}

@@ -219,3 +219,48 @@ test("AC18 a failed builds load surfaces through the error row, not 'No recent b
   assert.equal((await provider.getChildren())[0].contextValue, "errorRow");
   await provider.refresh();
 });
+
+test("AC8 Trigger build is inline only on a matching Current project row", () => {
+  const menus = JSON.parse(readFileSync(join(__dirname, "..", "..", "package.json"), "utf8")).contributes.menus["view/item/context"];
+  const t = menus.filter((m: any) => m.command === "buildkite.triggerCurrentProject");
+  assert.equal(t.length, 1);
+  assert.match(t[0].when, /viewItem == currentProject$/);
+  assert.equal(t[0].group, "inline");
+});
+
+async function runQuick(branchInit: string[], answers: (string | undefined)[]) {
+  const w = vscodeMock.window; const saved = { ...w };
+  const boxes: any[] = []; const warnings: string[] = []; const picks: unknown[] = []; const posts: any[] = [];
+  let i = 0;
+  w.showInputBox = async (o: any) => { boxes.push(o); return answers[i++]; };
+  w.showQuickPick = async (...a: unknown[]) => { picks.push(a); return undefined; };
+  w.showWarningMessage = async (m: string) => { warnings.push(m); return "Trigger build"; };
+  const savedFetch = globalThis.fetch;
+  globalThis.fetch = (async (url: string, init?: any) => { if (init?.method === "POST") { posts.push(JSON.parse(init.body)); return json({ number: 1 }); } return savedFetch(url, init); }) as typeof fetch;
+  try {
+    if (branchInit.length) execFileSync("git", ["-C", repo, ...branchInit], { stdio: "pipe" });
+    await provider.refresh(); await provider.triggerCurrent();
+  } finally { Object.assign(w, saved); globalThis.fetch = savedFetch; }
+  return { boxes, warnings, picks, posts };
+}
+
+test("AC9 quick trigger skips pipeline pick, pre-fills the current branch and keeps masked confirmation", async () => {
+  await setup;
+  const r = await runQuick(["checkout", "-q", "-B", "feature/q"], ["feature/q", "msg", "SECRET=hunter2"]);
+  assert.equal(r.picks.length, 0);
+  assert.equal(r.boxes[0].value, "feature/q");
+  assert.match(r.boxes[0].title, /App/);
+  assert.equal(r.boxes[2].password, true);
+  assert.match(r.warnings[0], /SECRET=••••••/);
+  assert.ok(!r.warnings[0].includes("hunter2"));
+  assert.equal(r.posts.length, 1);
+  assert.equal(r.posts[0].branch, "feature/q");
+});
+
+test("AC9 quick trigger pre-fills empty branch on detached HEAD", async () => {
+  await setup;
+  execFileSync("git", ["-C", repo, "-c", "user.name=t", "-c", "user.email=t@t", "commit", "-q", "--allow-empty", "-m", "c"], { stdio: "pipe" });
+  const r = await runQuick(["checkout", "-q", "--detach"], [undefined]);
+  assert.equal(r.boxes[0].value, "");
+  assert.equal(r.posts.length, 0);
+});

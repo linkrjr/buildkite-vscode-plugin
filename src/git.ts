@@ -9,3 +9,11 @@ export async function originRemote(folder: string): Promise<string | undefined> 
     return stdout.trim() || undefined;
   } catch { return undefined; }
 }
+
+/** Current branch of the folder; empty result (undefined) when detached, not a repo or git fails. */
+export async function currentBranch(folder: string): Promise<string | undefined> {
+  try {
+    const { stdout } = await execFileAsync("git", ["-C", folder, "symbolic-ref", "--short", "-q", "HEAD"], { timeout: 5000, windowsHide: true });
+    return stdout.trim() || undefined;
+  } catch { return undefined; }
+}
